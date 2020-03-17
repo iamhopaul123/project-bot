@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,6 +29,8 @@ var (
 	repo = os.Getenv("GITHUB_REPO")
 	// Private token of the GitHub Repo.
 	secret = os.Getenv("GITHUB_TOKEN")
+	// Chime webhook URL
+	chimeURL = os.Getenv("CHIME_URL")
 )
 
 var allColumns = []string{BACKLOG, IN_PROGRESS, IN_REVIEW, PENDING_RELEASE}
@@ -90,6 +94,17 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		}
 
 		pr := e.GetPullRequest()
+
+		// Send a message to chime room.
+		values := map[string]string{"Content": fmt.Sprintf("@Present A new pull-request is created: %s", pr.GetURL())}
+		jsonValue, _ := json.Marshal(values)
+		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
+		if err != nil {
+			log.Printf("🚨 error sending message to chime room: err=%s\n", err)
+			http.Error(w, err.Error(), httpResp.StatusCode)
+			return
+		}
+		log.Println("✅ sent a message to chime room")
 
 		// Get the project we want.
 		projects, _, err := client.Repositories.ListProjects(ctx, owner, repo, nil)

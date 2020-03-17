@@ -35,6 +35,7 @@ secrets:                      # Pass secrets from AWS Systems Manager (SSM) Para
  GITHUB_TOKEN: GITHUB_TOKEN  # The key is the name of the environment variable, the value is the name of the SSM parameter.
  GITHUB_REPO: GITHUB_REPO
  GITHUB_OWNER: GITHUB_OWNER
+ CHIME_URL: CHIME_URL
 
 #scaling:                      # Optional configuration for scaling your service.
 #  minCount: 1                   # Minimum number of tasks that should be running in your service.
