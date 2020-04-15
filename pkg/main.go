@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	PROJECT_NAME    = "Sprint"
+	PROJECT_NAME    = "Sprint 🏃‍♀️"
 	BACKLOG         = "Backlog"
 	IN_PROGRESS     = "In progress"
 	IN_REVIEW       = "In review"
@@ -96,7 +96,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		pr := e.GetPullRequest()
 
 		// Send a message to chime room.
-		values := map[string]string{"Content": fmt.Sprintf("@Present A new pull-request is created: %s", pr.GetURL())}
+		values := map[string]string{"Content": fmt.Sprintf("@Present A new pull-request is created: %s", pr.GetHTMLURL())}
 		jsonValue, _ := json.Marshal(values)
 		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
