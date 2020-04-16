@@ -87,6 +87,33 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	var client = github.NewClient(tc)
 
 	switch e := event.(type) {
+	case *github.StarEvent:
+		if e.GetAction() != "created" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		stargazersList, resp, err := client.Activity.ListStargazers(ctx, owner, repo, nil)
+		if err != nil {
+			log.Printf("🚨 error getting stargazers: err=%s\n", err)
+			http.Error(w, err.Error(), resp.StatusCode)
+		}
+		starNum := len(stargazersList)
+		if starNum%100 == 0 {
+			// Send a message to chime room.
+			values := map[string]string{"Content": fmt.Sprintf("@Present Congrat our repo has %v stars now 🎊", starNum)}
+			jsonValue, _ := json.Marshal(values)
+			httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
+			if err != nil {
+				log.Printf("🚨 error sending message to chime room: err=%s\n", err)
+				http.Error(w, err.Error(), httpResp.StatusCode)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			log.Printf("✅ sent a message with star number %v to chime room\n", starNum)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return
 	case *github.PullRequestEvent:
 		if e.GetAction() != "opened" {
 			w.WriteHeader(http.StatusAccepted)
