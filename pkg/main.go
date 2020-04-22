@@ -123,7 +123,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		pr := e.GetPullRequest()
 
 		// Send a message to chime room.
-		values := map[string]string{"Content": fmt.Sprintf("@Present A new pull-request is created: %s", pr.GetHTMLURL())}
+		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s", pr.GetHTMLURL())}
 		jsonValue, _ := json.Marshal(values)
 		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
