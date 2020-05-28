@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/google/go-github/v29/github"
 	"github.com/julienschmidt/httprouter"
@@ -20,6 +21,8 @@ const (
 	IN_PROGRESS     = "In progress"
 	IN_REVIEW       = "In review"
 	PENDING_RELEASE = "Pending release"
+
+	breakingChangeTag = "type/breaking-change"
 )
 
 var (
@@ -132,6 +135,21 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			return
 		}
 		log.Println("✅ sent a message to chime room")
+
+		// If it is a breaking change then tag with breaking change tag.
+		if pr.Title != nil {
+			log.Printf("title name %s\n", pr.GetTitle())
+			if strings.Contains(*pr.Title, "!:") {
+				_, resp, err := client.Issues.AddLabelsToIssue(ctx, owner, repo, *pr.Number, []string{breakingChangeTag})
+				if err != nil {
+					log.Printf("🚨 error adding breaking change label to pr %s: err=%s\n", pr.GetTitle(), err)
+					http.Error(w, err.Error(), resp.StatusCode)
+					return
+				}
+				w.WriteHeader(http.StatusCreated)
+				log.Printf("✅ added breaking change label %s to pull request %s \n", breakingChangeTag, pr.GetTitle())
+			}
+		}
 
 		// Get the project we want.
 		projects, _, err := client.Repositories.ListProjects(ctx, owner, repo, nil)
