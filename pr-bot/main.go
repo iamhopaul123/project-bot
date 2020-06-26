@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -34,6 +36,8 @@ var (
 	secret = os.Getenv("GITHUB_TOKEN")
 	// Chime webhook URL
 	chimeURL = os.Getenv("CHIME_URL")
+
+	teamReviewer = os.Getenv("TEAM_REVIEWER")
 )
 
 var allColumns = []string{BACKLOG, IN_PROGRESS, IN_REVIEW, PENDING_RELEASE}
@@ -125,20 +129,8 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 
 		pr := e.GetPullRequest()
 
-		// Send a message to chime room.
-		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s", pr.GetHTMLURL())}
-		jsonValue, _ := json.Marshal(values)
-		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
-		if err != nil {
-			log.Printf("🚨 error sending message to chime room: err=%s\n", err)
-			http.Error(w, err.Error(), httpResp.StatusCode)
-			return
-		}
-		log.Println("✅ sent a message to chime room")
-
-		// If it is a breaking change then tag with breaking change tag.
+		// If it is a breaking change then put up a breaking change label.
 		if pr.Title != nil {
-			log.Printf("title name %s\n", pr.GetTitle())
 			if strings.Contains(*pr.Title, "!:") {
 				_, resp, err := client.Issues.AddLabelsToIssue(ctx, owner, repo, *pr.Number, []string{breakingChangeTag})
 				if err != nil {
@@ -150,6 +142,56 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 				log.Printf("✅ added breaking change label %s to pull request %s \n", breakingChangeTag, pr.GetTitle())
 			}
 		}
+
+		// Assign appropriate reviewer
+		point := reviewerPoint(pr.Additions, pr.Deletions)
+		endpoint := fmt.Sprintf("http://lb.%s/get-reviewer", os.Getenv("COPILOT_SERVICE_DISCOVERY_ENDPOINT"))
+		sdURL := fmt.Sprintf("%s/%d", endpoint, point)
+		log.Printf("service discovery URL: %s\n", sdURL)
+		getReviewerResp, err := http.Post(sdURL, "application/json", bytes.NewBuffer([]byte{}))
+		if err != nil {
+			log.Printf("🚨 error getting reviewer: err=%s\n", err)
+			http.Error(w, err.Error(), getReviewerResp.StatusCode)
+			return
+		}
+		content, err := ioutil.ReadAll(getReviewerResp.Body)
+		if err != nil {
+			log.Printf("🚨 error reading response for getting reviewer: err=%s\n", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		reviewer, chimeID, err := lbRespParser(content)
+		if err != nil {
+			log.Printf("🚨 error parsing response for getting reviewer: err=%s\n", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("✅ get reviewer %s\n", reviewer)
+		var teamReviewers []string
+		if teamReviewer != "" {
+			teamReviewers = append(teamReviewers, teamReviewer)
+		}
+		_, requestReviewersResp, err := client.PullRequests.RequestReviewers(ctx, owner, repo, *pr.Number, github.ReviewersRequest{
+			Reviewers:     []string{reviewer},
+			TeamReviewers: teamReviewers,
+		})
+		if err != nil {
+			log.Printf("🚨 error requesting reviewer %s: err=%s\n", reviewer, err)
+			http.Error(w, err.Error(), requestReviewersResp.StatusCode)
+			return
+		}
+		log.Printf("✅ requested reviewer %s\n", reviewer)
+
+		// Send a message to chime room.
+		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s, @%s please review 🙏", pr.GetHTMLURL(), chimeID)}
+		jsonValue, _ := json.Marshal(values)
+		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
+		if err != nil {
+			log.Printf("🚨 error sending message to chime room: err=%s\n", err)
+			http.Error(w, err.Error(), httpResp.StatusCode)
+			return
+		}
+		log.Println("✅ sent a message to chime room")
 
 		// Get the project we want.
 		projects, _, err := client.Repositories.ListProjects(ctx, owner, repo, nil)
@@ -229,6 +271,13 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 }
 
 func healthCheckHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	endpoint := fmt.Sprintf("http://lb.%s/", os.Getenv("COPILOT_SERVICE_DISCOVERY_ENDPOINT"))
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		log.Printf("🚔 error checking health for service lb: err=%s\n", err)
+		http.Error(w, err.Error(), resp.StatusCode)
+		return
+	}
 	log.Println("🚑 healthcheck ok!")
 	w.WriteHeader(http.StatusOK)
 }
@@ -255,4 +304,27 @@ func main() {
 	})
 
 	log.Fatal(http.ListenAndServe(":80", router))
+}
+
+func reviewerPoint(additions, deletions *int) int64 {
+	var add, del int64
+	if additions == nil {
+		add = 0
+	} else {
+		add = int64(*additions)
+	}
+	if deletions == nil {
+		del = 0
+	} else {
+		del = int64(*deletions)
+	}
+	return add + int64(math.Abs(float64(add-del))) + del
+}
+
+func lbRespParser(resp []byte) (reviewer string, chimeID string, err error) {
+	arr := strings.Split(string(resp), ",")
+	if len(arr) != 2 {
+		return "", "", fmt.Errorf("unable to parse %s", string(resp))
+	}
+	return arr[0], arr[1], nil
 }

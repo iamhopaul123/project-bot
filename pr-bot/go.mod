@@ -1,4 +1,4 @@
-module github.com/kohidave/ecs-kudos-api
+module github.com/iamhopaul123/project-bot
 
 go 1.13
 
