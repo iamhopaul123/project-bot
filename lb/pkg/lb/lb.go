@@ -2,10 +2,8 @@ package lb
 
 import (
 	"errors"
-	"math/rand"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/bradfitz/slice"
@@ -21,11 +19,12 @@ var (
 )
 
 type ReviewerLoadBalancer struct {
+	author   string
 	reviewer []ddb.Reviewer
 	dbSvc    *ddb.ReviewerDB
 }
 
-func NewReviewerLoadBalancer() (*ReviewerLoadBalancer, error) {
+func NewReviewerLoadBalancer(author string) (*ReviewerLoadBalancer, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
@@ -36,6 +35,7 @@ func NewReviewerLoadBalancer() (*ReviewerLoadBalancer, error) {
 		return nil, err
 	}
 	return &ReviewerLoadBalancer{
+		author:   author,
 		reviewer: reviews,
 		dbSvc:    db,
 	}, nil
@@ -52,12 +52,22 @@ func (lb *ReviewerLoadBalancer) GetReviewer(point int64) (*ddb.Reviewer, error) 
 	slice.Sort(reviewers[:], func(i, j int) bool {
 		return *reviewers[i].Point < *reviewers[j].Point
 	})
-	reviewer := &ddb.Reviewer{
-		Name:    reviewers[0].Name,
-		Point:   reviewers[0].Point,
-		ChimeID: reviewers[0].ChimeID,
+	var reviewer *ddb.Reviewer
+	if *reviewers[0].Name != lb.author {
+		reviewer = &ddb.Reviewer{
+			Name:    reviewers[0].Name,
+			Point:   reviewers[0].Point,
+			ChimeID: reviewers[0].ChimeID,
+		}
+		*reviewers[0].Point += point
+	} else {
+		reviewer = &ddb.Reviewer{
+			Name:    reviewers[1].Name,
+			Point:   reviewers[1].Point,
+			ChimeID: reviewers[1].ChimeID,
+		}
+		*reviewers[1].Point += point
 	}
-	*reviewers[0].Point += point
 	slice.Sort(reviewers[:], func(i, j int) bool {
 		return *reviewers[i].Point < *reviewers[j].Point
 	})
@@ -71,19 +81,6 @@ func (lb *ReviewerLoadBalancer) GetReviewer(point int64) (*ddb.Reviewer, error) 
 		return nil, err
 	}
 	return reviewer, nil
-}
-
-func (lb *ReviewerLoadBalancer) RandomReviewers() (*ddb.Reviewer, error) {
-	reviewers, err := lb.dbSvc.Read()
-	if err != nil {
-		return nil, err
-	}
-	if len(reviewers) == 0 {
-		return nil, errors.New("no reviewers in the ddb table")
-	}
-	s1 := rand.NewSource(time.Now().UnixNano())
-	r1 := rand.New(s1)
-	return &reviewers[r1.Intn(len(reviewers))], nil
 }
 
 // foo,bar -> [foo, bar]

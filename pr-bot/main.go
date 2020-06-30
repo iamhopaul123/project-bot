@@ -146,7 +146,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		// Assign appropriate reviewer
 		point := reviewerPoint(pr.Additions, pr.Deletions)
 		endpoint := fmt.Sprintf("http://lb.%s/get-reviewer", os.Getenv("COPILOT_SERVICE_DISCOVERY_ENDPOINT"))
-		sdURL := fmt.Sprintf("%s/%d", endpoint, point)
+		sdURL := fmt.Sprintf("%s/%s/%d", endpoint, *pr.User.Login, point)
 		log.Printf("service discovery URL: %s\n", sdURL)
 		getReviewerResp, err := http.Post(sdURL, "application/json", bytes.NewBuffer([]byte{}))
 		if err != nil {

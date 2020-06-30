@@ -22,29 +22,10 @@ func HealthCheck(w http.ResponseWriter, req *http.Request, ps httprouter.Params)
 	w.Write([]byte("Ready"))
 }
 
-// RandomReviewerHandler returns a random reviewer.
-func RandomReviewerHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	reviewerLB, err := lb.NewReviewerLoadBalancer()
-	if err != nil {
-		log.Printf("🚨 error could not init the reviewer lb: err=%s\n", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	reviewer, err := reviewerLB.RandomReviewers()
-	if err != nil {
-		log.Printf("🚨 error could not get a random reviewer: err=%s\n", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	log.Println("✅ Successfully get a random reviewer from the ddb table")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(*reviewer.Name))
-}
-
 // GetReviewerHandler returns a reviewer with minimal point and add point to it.
 func GetReviewerHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	pointStr := ps.ByName("point")
+	author := ps.ByName("author")
 	point, err := strconv.ParseInt(pointStr, 10, 64)
 	if err != nil {
 		if err != nil {
@@ -53,7 +34,7 @@ func GetReviewerHandler(w http.ResponseWriter, req *http.Request, ps httprouter.
 			return
 		}
 	}
-	reviewerLB, err := lb.NewReviewerLoadBalancer()
+	reviewerLB, err := lb.NewReviewerLoadBalancer(author)
 	if err != nil {
 		log.Printf("🚨 error could not init the reviewer lb: err=%s\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -73,8 +54,7 @@ func GetReviewerHandler(w http.ResponseWriter, req *http.Request, ps httprouter.
 
 func main() {
 	router := httprouter.New()
-	router.POST("/random-reviewer", RandomReviewerHandler)
-	router.POST("/get-reviewer/:point", GetReviewerHandler)
+	router.POST("/get-reviewer/:author/:point", GetReviewerHandler)
 
 	// Health Check
 	router.GET("/", HealthCheck)
