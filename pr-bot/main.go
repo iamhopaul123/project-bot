@@ -307,18 +307,23 @@ func main() {
 }
 
 func reviewerPoint(additions, deletions *int) int64 {
-	var add, del int64
+	var add, del float64
 	if additions == nil {
 		add = 0
 	} else {
-		add = int64(*additions)
+		add = float64(*additions)
 	}
 	if deletions == nil {
 		del = 0
 	} else {
-		del = int64(*deletions)
+		del = float64(*deletions)
 	}
-	return add + int64(math.Abs(float64(add-del))) + del
+	point := add + math.Abs(float64(add-del)) + del
+	return int64(gaussian(point))
+}
+
+func gaussian(x float64) float64 {
+	return math.Exp(-0.5 * math.Pow(x/5000, 2))
 }
 
 func lbRespParser(resp []byte) (reviewer string, chimeID string, err error) {
