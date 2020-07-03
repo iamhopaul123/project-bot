@@ -166,7 +166,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("✅ get reviewer %s\n", reviewer)
+		log.Printf("✅ get reviewer %s with point %d\n", reviewer, point)
 		var teamReviewers []string
 		if teamReviewer != "" {
 			teamReviewers = append(teamReviewers, teamReviewer)
@@ -278,6 +278,7 @@ func healthCheckHandler(w http.ResponseWriter, req *http.Request, ps httprouter.
 		http.Error(w, err.Error(), resp.StatusCode)
 		return
 	}
+	defer resp.Body.Close()
 	log.Println("🚑 healthcheck ok!")
 	w.WriteHeader(http.StatusOK)
 }
@@ -319,10 +320,10 @@ func reviewerPoint(additions, deletions *int) int64 {
 		del = float64(*deletions)
 	}
 	point := add + math.Abs(float64(add-del)) + del
-	return int64(gaussian(point))
+	return int64(gaussianCoef(point) * point)
 }
 
-func gaussian(x float64) float64 {
+func gaussianCoef(x float64) float64 {
 	return math.Exp(-0.5 * math.Pow(x/5000, 2))
 }
 
