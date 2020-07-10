@@ -183,7 +183,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		log.Printf("✅ requested reviewer %s\n", reviewer)
 
 		// Send a message to chime room.
-		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s, @%s please review 🙏", pr.GetHTMLURL(), chimeID)}
+		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s @%s please review 🙏", pr.GetHTMLURL(), chimeID)}
 		jsonValue, _ := json.Marshal(values)
 		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
