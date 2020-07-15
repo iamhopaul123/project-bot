@@ -119,6 +119,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			log.Printf("✅ sent a message with star number %v to chime room\n", starNum)
 			return
 		}
+		log.Printf("✅ repo %s has %v stars now\n", repo, starNum)
 		w.WriteHeader(http.StatusAccepted)
 		return
 	case *github.PullRequestEvent:
