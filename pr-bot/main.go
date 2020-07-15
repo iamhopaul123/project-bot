@@ -105,7 +105,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			http.Error(w, err.Error(), resp.StatusCode)
 		}
 		starNum := *repository.StargazersCount
-		if starNum%100 == 0 {
+		if starNum%50 == 0 {
 			// Send a message to chime room.
 			values := map[string]string{"Content": fmt.Sprintf("@Present Congrat our repo has %v stars now 🎊", starNum)}
 			jsonValue, _ := json.Marshal(values)
