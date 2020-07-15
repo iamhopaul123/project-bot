@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v32/github"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/oauth2"
 )
@@ -99,12 +99,12 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			w.WriteHeader(http.StatusAccepted)
 			return
 		}
-		stargazersList, resp, err := client.Activity.ListStargazers(ctx, owner, repo, nil)
+		repository, resp, err := client.Repositories.Get(ctx, owner, repo)
 		if err != nil {
-			log.Printf("🚨 error getting stargazers: err=%s\n", err)
+			log.Printf("🚨 error getting repository %s: err=%s\n", repo, err)
 			http.Error(w, err.Error(), resp.StatusCode)
 		}
-		starNum := len(stargazersList)
+		starNum := *repository.StargazersCount
 		if starNum%100 == 0 {
 			// Send a message to chime room.
 			values := map[string]string{"Content": fmt.Sprintf("@Present Congrat our repo has %v stars now 🎊", starNum)}
