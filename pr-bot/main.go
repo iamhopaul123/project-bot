@@ -34,8 +34,8 @@ var (
 	repo = os.Getenv("GITHUB_REPO")
 	// Private token of the GitHub Repo.
 	secret = os.Getenv("GITHUB_TOKEN")
-	// Chime webhook URL
-	chimeURL = os.Getenv("CHIME_URL")
+	// Webhook URL
+	webhookURL = os.Getenv("CHIME_URL")
 
 	teamReviewer = os.Getenv("TEAM_REVIEWER")
 )
@@ -106,17 +106,17 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		}
 		starNum := *repository.StargazersCount
 		if starNum%50 == 0 {
-			// Send a message to chime room.
+			// Send a message to chat room.
 			values := map[string]string{"Content": fmt.Sprintf("@Present Congrat our repo has %v stars now 🎊", starNum)}
 			jsonValue, _ := json.Marshal(values)
-			httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
+			httpResp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonValue))
 			if err != nil {
-				log.Printf("🚨 error sending message to chime room: err=%s\n", err)
+				log.Printf("🚨 error sending message to chat room: err=%s\n", err)
 				http.Error(w, err.Error(), httpResp.StatusCode)
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			log.Printf("✅ sent a message with star number %v to chime room\n", starNum)
+			log.Printf("✅ sent a message with star number %v to chat room\n", starNum)
 			return
 		}
 		log.Printf("✅ repo %s has %v stars now\n", repo, starNum)
@@ -161,7 +161,7 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		reviewer, chimeID, err := lbRespParser(content)
+		reviewer, alias, err := lbRespParser(content)
 		if err != nil {
 			log.Printf("🚨 error parsing response for getting reviewer: err=%s\n", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -183,16 +183,16 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		}
 		log.Printf("✅ requested reviewer %s\n", reviewer)
 
-		// Send a message to chime room.
-		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s @%s please review 🙏", pr.GetHTMLURL(), chimeID)}
+		// Send a message to chat room.
+		values := map[string]string{"Content": fmt.Sprintf("A new pull-request is created: %s @%s please review 🙏", pr.GetHTMLURL(), alias)}
 		jsonValue, _ := json.Marshal(values)
-		httpResp, err := http.Post(chimeURL, "application/json", bytes.NewBuffer(jsonValue))
+		httpResp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
-			log.Printf("🚨 error sending message to chime room: err=%s\n", err)
+			log.Printf("🚨 error sending message to chat room: err=%s\n", err)
 			http.Error(w, err.Error(), httpResp.StatusCode)
 			return
 		}
-		log.Println("✅ sent a message to chime room")
+		log.Println("✅ sent a message to chat room")
 
 		// Get the project we want.
 		projects, _, err := client.Repositories.ListProjects(ctx, owner, repo, nil)
@@ -328,7 +328,7 @@ func gaussianCoef(x float64) float64 {
 	return math.Exp(-0.5 * math.Pow(x/5000, 2))
 }
 
-func lbRespParser(resp []byte) (reviewer string, chimeID string, err error) {
+func lbRespParser(resp []byte) (reviewer string, alias string, err error) {
 	arr := strings.Split(string(resp), ",")
 	if len(arr) != 2 {
 		return "", "", fmt.Errorf("unable to parse %s", string(resp))
