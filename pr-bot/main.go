@@ -265,6 +265,27 @@ func handler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		w.WriteHeader(http.StatusCreated)
 		log.Printf("✅ moved an existing pull-request project card to %s column\n", IN_REVIEW)
 		return
+	case *github.IssuesEvent:
+		action := e.GetAction()
+		if action != "opened" && action != "reopened" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		issue := e.GetIssue()
+		msg := fmt.Sprintf("A new issue is created: %s", issue.GetHTMLURL())
+		if action == "reopened" {
+			msg = fmt.Sprintf("Issue #%v is reopened: %s", *issue.Number, issue.GetHTMLURL())
+		}
+		// Send a message to chat room.
+		values := map[string]string{"Content": msg}
+		jsonValue, _ := json.Marshal(values)
+		httpResp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonValue))
+		if err != nil {
+			log.Printf("🚨 error sending message to chat room: err=%s\n", err)
+			http.Error(w, err.Error(), httpResp.StatusCode)
+			return
+		}
+		log.Println("✅ sent a message to chat room")
 	default:
 		log.Printf("🤷‍♀️ event type %s\n", github.WebHookType(req))
 		return
